@@ -1,0 +1,62 @@
+Vagrant.configure("2") do |config|
+    # Configuración común para las tres máquinas
+    config.vm.box = "ubuntu/jammy64" # Puedes usar otra versión de Ubuntu si lo prefieres
+    config.vm.provider "virtualbox" do |vb|
+      vb.cpus = 1
+      vb.memory = 512
+    end
+  
+    # Servidor Apache 1
+    config.vm.define "web1" do |web1|
+      web1.vm.hostname = "web1"
+      web1.vm.network "private_network", ip: "192.168.33.10"
+      web1.vm.synced_folder "web1src", "/var/www/html" # Directorio compartido
+      web1.vm.provision "shell", inline: <<-SHELL
+        apt-get update
+        apt-get install -y apache2
+        systemctl enable apache2
+        systemctl start apache2
+      SHELL
+    end
+  
+    # Servidor Apache 2
+    config.vm.define "web2" do |web2|
+      web2.vm.hostname = "web2"
+      web2.vm.network "private_network", ip: "192.168.33.11"
+      web2.vm.synced_folder "web2src", "/var/www/html" # Directorio compartido
+      web2.vm.provision "shell", inline: <<-SHELL
+        apt-get update
+        apt-get install -y apache2
+        systemctl enable apache2
+        systemctl start apache2
+      SHELL
+    end
+  
+    # Balanceador de carga con Nginx
+    config.vm.define "loadbalancer" do |lb|
+      lb.vm.hostname = "loadbalancer"
+      lb.vm.network "private_network", ip: "192.168.33.12"
+      lb.vm.provision "shell", inline: <<-SHELL
+        apt-get update
+        apt-get install -y nginx
+        # Configuración de Nginx como balanceador de carga
+        cat <<EOL > /etc/nginx/conf.d/load_balancer.conf
+  upstream backend {
+      server 192.168.33.10;
+      server 192.168.33.11;
+  }
+  
+  server {
+      listen 80;
+  
+      location / {
+          proxy_pass http://backend;
+      }
+  }
+  EOL
+        systemctl enable nginx
+        systemctl restart nginx
+      SHELL
+    end
+  end
+  
